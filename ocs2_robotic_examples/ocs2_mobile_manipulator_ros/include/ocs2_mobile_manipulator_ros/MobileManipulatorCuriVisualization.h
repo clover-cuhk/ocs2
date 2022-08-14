@@ -69,6 +69,7 @@ class MobileManipulatorCuriVisualization final : public DummyObserver {
   tf::TransformBroadcaster tfBroadcaster_;
 
   ros::Publisher jointStatePublisher_;
+  ros::Publisher cmdVelPublisher_;
 
   ros::Publisher stateOptimizedPublisher_;
   ros::Publisher stateOptimizedPosePublisher_;

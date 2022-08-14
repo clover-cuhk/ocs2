@@ -92,6 +92,7 @@ void MobileManipulatorCuriVisualization::launchVisualizerNode(ros::NodeHandle& n
   robotStatePublisherPtr_->publishFixedTransforms(true);
 
   jointStatePublisher_ = nodeHandle.advertise<sensor_msgs::JointState>("/joint_cmd", 1);
+  cmdVelPublisher_ = nodeHandle.advertise<geometry_msgs::Twist>("/cmd_vel", 1);
 
   stateOptimizedPublisher_ = nodeHandle.advertise<visualization_msgs::MarkerArray>("/mobile_manipulator/optimizedStateTrajectory", 1);
   stateOptimizedPosePublisher_ = nodeHandle.advertise<geometry_msgs::PoseArray>("/mobile_manipulator/optimizedPoseTrajectory", 1);
@@ -162,11 +163,25 @@ void MobileManipulatorCuriVisualization::publishObservation(const ros::Time& tim
   }
   robotStatePublisherPtr_->publishTransforms(jointPositions, timeStamp);
 
+  // Publish base velocity command
+  auto base_vel = observation.input.head(2);
+  geometry_msgs::Twist twist_cmd;
+  twist_cmd.linear.x = base_vel[0];  // TODO Support y-axis velocity
+  twist_cmd.angular.z = base_vel[1];
+  cmdVelPublisher_.publish(twist_cmd);
+
   // Publish joint command for the robot
+  const auto v_arm = getArmJointVelocities(observation.input, modelInfo_);
+  std::map<std::string, scalar_t> jointVelocities;
+  for (size_t i = 0; i < modelInfo_.dofNames.size(); i++) {
+    jointVelocities[modelInfo_.dofNames[i]] = v_arm(i);
+  }
   sensor_msgs::JointState cmd;
   for (const auto & dofName : modelInfo_.dofNames) {
     cmd.name.push_back(dofName);
     cmd.position.push_back(jointPositions[dofName]);
+    cmd.velocity.push_back(jointVelocities[dofName]);
+    cmd.effort.push_back(0.);  // FIXME Torque control is not supported
   }
   jointStatePublisher_.publish(cmd);
 }

@@ -104,12 +104,21 @@ Eigen::Block<Derived, -1, 1> getArmJointAngles(Eigen::MatrixBase<Derived>& state
 }
 
 template <typename Derived>
-const Eigen::Block<const Derived, -1, 1> getArmJointAngles(const Eigen::MatrixBase<Derived>& state, const ManipulatorModelInfo& info) {
+Eigen::Block<const Derived, -1, 1> getArmJointAngles(const Eigen::MatrixBase<Derived>& state, const ManipulatorModelInfo& info) {
   assert(state.rows() == info.stateDim);
   assert(state.cols() == 1);
   // resolve for arm dof start index
   const size_t startRow = info.stateDim - info.armDim;
   return Eigen::Block<const Derived, -1, 1>(state.derived(), startRow, 0, info.armDim, 1);
+}
+
+template <typename Derived>
+Eigen::Block<const Derived, -1, 1> getArmJointVelocities(const Eigen::MatrixBase<Derived>& input, const ManipulatorModelInfo& info) {
+  assert(state.rows() == info.stateDim);
+  assert(state.cols() == 1);
+  // resolve for arm dof start index
+  const size_t startRow = info.inputDim - info.armDim;
+  return Eigen::Block<const Derived, -1, 1>(input.derived(), startRow, 0, info.armDim, 1);
 }
 
 }  // namespace mobile_manipulator
