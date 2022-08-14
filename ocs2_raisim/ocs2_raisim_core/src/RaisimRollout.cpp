@@ -133,7 +133,7 @@ vector_t RaisimRollout::run(scalar_t initTime, const vector_t& initState, scalar
   postEventIndices.clear();
   postEventIndices.reserve(numSubsystems - 1);
 
-  // Set inital state to simulation if requested
+  // Set initial state to simulation if requested
   if (raisimRolloutSettings_.setSimulatorStateOnRolloutRunAlways_ or raisimRolloutSettings_.setSimulatorStateOnRolloutRunOnce_) {
     Eigen::VectorXd q_init, dq_init;
     inputTrajectory.emplace_back(controller->computeInput(timeIntervalArray.front().first, initState));
