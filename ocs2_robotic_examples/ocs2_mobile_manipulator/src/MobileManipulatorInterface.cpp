@@ -57,6 +57,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "ocs2_mobile_manipulator/dynamics/DefaultManipulatorDynamics.h"
 #include "ocs2_mobile_manipulator/dynamics/FloatingArmManipulatorDynamics.h"
 #include "ocs2_mobile_manipulator/dynamics/FullyActuatedFloatingArmManipulatorDynamics.h"
+#include "ocs2_mobile_manipulator/dynamics/OmniBasedMobileManipulatorDynamics.h"
 #include "ocs2_mobile_manipulator/dynamics/WheelBasedMobileManipulatorDynamics.h"
 
 // Boost
@@ -69,7 +70,8 @@ namespace mobile_manipulator {
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-MobileManipulatorInterface::MobileManipulatorInterface(const std::string& taskFile, const std::string& libraryFolder,
+MobileManipulatorInterface::MobileManipulatorInterface(const std::string& taskFile,
+                                                       const std::string& libraryFolder,
                                                        const std::string& urdfFile) {
   // check that task file exists
   boost::filesystem::path taskFilePath(taskFile);
@@ -95,7 +97,8 @@ MobileManipulatorInterface::MobileManipulatorInterface(const std::string& taskFi
   boost::property_tree::read_info(taskFile, pt);
   // resolve meta-information about the model
   // read manipulator type
-  ManipulatorModelType modelType = mobile_manipulator::loadManipulatorType(taskFile, "model_information.manipulatorModelType");
+  ManipulatorModelType modelType =
+      mobile_manipulator::loadManipulatorType(taskFile, "model_information.manipulatorModelType");
   // read the joints to make fixed
   std::vector<std::string> removeJointNames;
   loadData::loadStdVector<std::string>(taskFile, "model_information.removeJoints", removeJointNames, false);
@@ -120,7 +123,8 @@ MobileManipulatorInterface::MobileManipulatorInterface(const std::string& taskFi
   std::cerr << *pinocchioInterfacePtr_;
 
   // ManipulatorModelInfo
-  manipulatorModelInfo_ = mobile_manipulator::createManipulatorModelInfo(*pinocchioInterfacePtr_, modelType, baseFrame, eeFrame);
+  manipulatorModelInfo_ =
+      mobile_manipulator::createManipulatorModelInfo(*pinocchioInterfacePtr_, modelType, baseFrame, eeFrame);
 
   bool usePreComputation = true;
   bool recompileLibraries = true;
@@ -156,9 +160,7 @@ MobileManipulatorInterface::MobileManipulatorInterface(const std::string& taskFi
   // Reference Manager
   referenceManagerPtr_.reset(new ReferenceManager);
 
-  /*
-   * Optimal control problem
-   */
+  /* Optimal control problem */
   // Cost
   problem_.costPtr->add("inputCost", getQuadraticInputCost(taskFile));
 
@@ -166,17 +168,19 @@ MobileManipulatorInterface::MobileManipulatorInterface(const std::string& taskFi
   // joint limits constraint
   problem_.softConstraintPtr->add("jointLimits", getJointLimitSoftConstraint(*pinocchioInterfacePtr_, taskFile));
   // end-effector state constraint
-  problem_.stateSoftConstraintPtr->add("endEffector", getEndEffectorConstraint(*pinocchioInterfacePtr_, taskFile, "endEffector",
-                                                                               usePreComputation, libraryFolder, recompileLibraries));
-  problem_.finalSoftConstraintPtr->add("finalEndEffector", getEndEffectorConstraint(*pinocchioInterfacePtr_, taskFile, "finalEndEffector",
-                                                                                    usePreComputation, libraryFolder, recompileLibraries));
+  problem_.stateSoftConstraintPtr->add(
+      "endEffector", getEndEffectorConstraint(*pinocchioInterfacePtr_, taskFile, "endEffector", usePreComputation,
+                                              libraryFolder, recompileLibraries));
+  problem_.finalSoftConstraintPtr->add("finalEndEffector",
+                                       getEndEffectorConstraint(*pinocchioInterfacePtr_, taskFile, "finalEndEffector",
+                                                                usePreComputation, libraryFolder, recompileLibraries));
   // self-collision avoidance constraint
   bool activateSelfCollision = true;
   loadData::loadPtreeValue(pt, activateSelfCollision, "selfCollision.activate", true);
   if (activateSelfCollision) {
     problem_.stateSoftConstraintPtr->add(
-        "selfCollision", getSelfCollisionConstraint(*pinocchioInterfacePtr_, taskFile, urdfFile, "selfCollision", usePreComputation,
-                                                    libraryFolder, recompileLibraries));
+        "selfCollision", getSelfCollisionConstraint(*pinocchioInterfacePtr_, taskFile, urdfFile, "selfCollision",
+                                                    usePreComputation, libraryFolder, recompileLibraries));
   }
 
   // Dynamics
@@ -187,18 +191,23 @@ MobileManipulatorInterface::MobileManipulatorInterface(const std::string& taskFi
       break;
     }
     case ManipulatorModelType::FloatingArmManipulator: {
-      problem_.dynamicsPtr.reset(
-          new FloatingArmManipulatorDynamics(manipulatorModelInfo_, "dynamics", libraryFolder, recompileLibraries, true));
+      problem_.dynamicsPtr.reset(new FloatingArmManipulatorDynamics(manipulatorModelInfo_, "dynamics", libraryFolder,
+                                                                    recompileLibraries, true));
       break;
     }
     case ManipulatorModelType::FullyActuatedFloatingArmManipulator: {
-      problem_.dynamicsPtr.reset(
-          new FullyActuatedFloatingArmManipulatorDynamics(manipulatorModelInfo_, "dynamics", libraryFolder, recompileLibraries, true));
+      problem_.dynamicsPtr.reset(new FullyActuatedFloatingArmManipulatorDynamics(
+          manipulatorModelInfo_, "dynamics", libraryFolder, recompileLibraries, true));
       break;
     }
     case ManipulatorModelType::WheelBasedMobileManipulator: {
-      problem_.dynamicsPtr.reset(
-          new WheelBasedMobileManipulatorDynamics(manipulatorModelInfo_, "dynamics", libraryFolder, recompileLibraries, true));
+      problem_.dynamicsPtr.reset(new WheelBasedMobileManipulatorDynamics(manipulatorModelInfo_, "dynamics",
+                                                                         libraryFolder, recompileLibraries, true));
+      break;
+    }
+    case ManipulatorModelType::OmniBasedMobileManipulator: {
+      problem_.dynamicsPtr.reset(new OmniBasedMobileManipulatorDynamics(manipulatorModelInfo_, "dynamics",
+                                                                        libraryFolder, recompileLibraries, true));
       break;
     }
     default:
@@ -209,7 +218,8 @@ MobileManipulatorInterface::MobileManipulatorInterface(const std::string& taskFi
    * Pre-computation
    */
   if (usePreComputation) {
-    problem_.preComputationPtr.reset(new MobileManipulatorPreComputation(*pinocchioInterfacePtr_, manipulatorModelInfo_));
+    problem_.preComputationPtr.reset(
+        new MobileManipulatorPreComputation(*pinocchioInterfacePtr_, manipulatorModelInfo_));
   }
 
   // Rollout
@@ -231,7 +241,8 @@ std::unique_ptr<StateInputCost> MobileManipulatorInterface::getQuadraticInputCos
   // arm base DOFs input costs
   if (baseInputDim > 0) {
     matrix_t R_base = matrix_t::Zero(baseInputDim, baseInputDim);
-    loadData::loadEigenMatrix(taskFile, "inputCost.R.base." + modelTypeEnumToString(manipulatorModelInfo_.manipulatorModelType), R_base);
+    loadData::loadEigenMatrix(
+        taskFile, "inputCost.R.base." + modelTypeEnumToString(manipulatorModelInfo_.manipulatorModelType), R_base);
     R.topLeftCorner(baseInputDim, baseInputDim) = R_base;
   }
 
@@ -251,10 +262,13 @@ std::unique_ptr<StateInputCost> MobileManipulatorInterface::getQuadraticInputCos
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-std::unique_ptr<StateCost> MobileManipulatorInterface::getEndEffectorConstraint(const PinocchioInterface& pinocchioInterface,
-                                                                                const std::string& taskFile, const std::string& prefix,
-                                                                                bool usePreComputation, const std::string& libraryFolder,
-                                                                                bool recompileLibraries) {
+std::unique_ptr<StateCost> MobileManipulatorInterface::getEndEffectorConstraint(
+    const PinocchioInterface& pinocchioInterface,
+    const std::string& taskFile,
+    const std::string& prefix,
+    bool usePreComputation,
+    const std::string& libraryFolder,
+    bool recompileLibraries) {
   scalar_t muPosition = 1.0;
   scalar_t muOrientation = 1.0;
   const std::string name = "WRIST_2";
@@ -278,15 +292,17 @@ std::unique_ptr<StateCost> MobileManipulatorInterface::getEndEffectorConstraint(
     constraint.reset(new EndEffectorConstraint(eeKinematics, *referenceManagerPtr_));
   } else {
     MobileManipulatorPinocchioMappingCppAd pinocchioMappingCppAd(manipulatorModelInfo_);
-    PinocchioEndEffectorKinematicsCppAd eeKinematics(pinocchioInterface, pinocchioMappingCppAd, {manipulatorModelInfo_.eeFrame},
-                                                     manipulatorModelInfo_.stateDim, manipulatorModelInfo_.inputDim,
-                                                     "end_effector_kinematics", libraryFolder, recompileLibraries, false);
+    PinocchioEndEffectorKinematicsCppAd eeKinematics(
+        pinocchioInterface, pinocchioMappingCppAd, {manipulatorModelInfo_.eeFrame}, manipulatorModelInfo_.stateDim,
+        manipulatorModelInfo_.inputDim, "end_effector_kinematics", libraryFolder, recompileLibraries, false);
     constraint.reset(new EndEffectorConstraint(eeKinematics, *referenceManagerPtr_));
   }
 
   std::vector<std::unique_ptr<PenaltyBase>> penaltyArray(6);
-  std::generate_n(penaltyArray.begin(), 3, [&] { return std::unique_ptr<PenaltyBase>(new QuadraticPenalty(muPosition)); });
-  std::generate_n(penaltyArray.begin() + 3, 3, [&] { return std::unique_ptr<PenaltyBase>(new QuadraticPenalty(muOrientation)); });
+  std::generate_n(penaltyArray.begin(), 3,
+                  [&] { return std::unique_ptr<PenaltyBase>(new QuadraticPenalty(muPosition)); });
+  std::generate_n(penaltyArray.begin() + 3, 3,
+                  [&] { return std::unique_ptr<PenaltyBase>(new QuadraticPenalty(muOrientation)); });
 
   return std::unique_ptr<StateCost>(new StateSoftConstraint(std::move(constraint), std::move(penaltyArray)));
 }
@@ -294,11 +310,14 @@ std::unique_ptr<StateCost> MobileManipulatorInterface::getEndEffectorConstraint(
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-std::unique_ptr<StateCost> MobileManipulatorInterface::getSelfCollisionConstraint(const PinocchioInterface& pinocchioInterface,
-                                                                                  const std::string& taskFile, const std::string& urdfFile,
-                                                                                  const std::string& prefix, bool usePreComputation,
-                                                                                  const std::string& libraryFolder,
-                                                                                  bool recompileLibraries) {
+std::unique_ptr<StateCost> MobileManipulatorInterface::getSelfCollisionConstraint(
+    const PinocchioInterface& pinocchioInterface,
+    const std::string& taskFile,
+    const std::string& urdfFile,
+    const std::string& prefix,
+    bool usePreComputation,
+    const std::string& libraryFolder,
+    bool recompileLibraries) {
   std::vector<std::pair<size_t, size_t>> collisionObjectPairs;
   std::vector<std::pair<std::string, std::string>> collisionLinkPairs;
   scalar_t mu = 1e-2;
@@ -327,8 +346,8 @@ std::unique_ptr<StateCost> MobileManipulatorInterface::getSelfCollisionConstrain
         MobileManipulatorPinocchioMapping(manipulatorModelInfo_), std::move(geometryInterface), minimumDistance));
   } else {
     constraint = std::unique_ptr<StateConstraint>(new SelfCollisionConstraintCppAd(
-        pinocchioInterface, MobileManipulatorPinocchioMapping(manipulatorModelInfo_), std::move(geometryInterface), minimumDistance,
-        "self_collision", libraryFolder, recompileLibraries, false));
+        pinocchioInterface, MobileManipulatorPinocchioMapping(manipulatorModelInfo_), std::move(geometryInterface),
+        minimumDistance, "self_collision", libraryFolder, recompileLibraries, false));
   }
 
   std::unique_ptr<PenaltyBase> penalty(new RelaxedBarrierPenalty({mu, delta}));
@@ -339,8 +358,9 @@ std::unique_ptr<StateCost> MobileManipulatorInterface::getSelfCollisionConstrain
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-std::unique_ptr<StateInputCost> MobileManipulatorInterface::getJointLimitSoftConstraint(const PinocchioInterface& pinocchioInterface,
-                                                                                        const std::string& taskFile) {
+std::unique_ptr<StateInputCost> MobileManipulatorInterface::getJointLimitSoftConstraint(
+    const PinocchioInterface& pinocchioInterface,
+    const std::string& taskFile) {
   boost::property_tree::ptree pt;
   boost::property_tree::read_info(taskFile, pt);
 
@@ -394,12 +414,14 @@ std::unique_ptr<StateInputCost> MobileManipulatorInterface::getJointLimitSoftCon
     if (baseInputDim > 0) {
       vector_t lowerBoundBase = vector_t::Zero(baseInputDim);
       vector_t upperBoundBase = vector_t::Zero(baseInputDim);
-      loadData::loadEigenMatrix(taskFile,
-                                "jointVelocityLimits.lowerBound.base." + modelTypeEnumToString(manipulatorModelInfo_.manipulatorModelType),
-                                lowerBoundBase);
-      loadData::loadEigenMatrix(taskFile,
-                                "jointVelocityLimits.upperBound.base." + modelTypeEnumToString(manipulatorModelInfo_.manipulatorModelType),
-                                upperBoundBase);
+      loadData::loadEigenMatrix(
+          taskFile,
+          "jointVelocityLimits.lowerBound.base." + modelTypeEnumToString(manipulatorModelInfo_.manipulatorModelType),
+          lowerBoundBase);
+      loadData::loadEigenMatrix(
+          taskFile,
+          "jointVelocityLimits.upperBound.base." + modelTypeEnumToString(manipulatorModelInfo_.manipulatorModelType),
+          upperBoundBase);
       lowerBound.head(baseInputDim) = lowerBoundBase;
       upperBound.head(baseInputDim) = upperBoundBase;
     }
@@ -431,8 +453,10 @@ std::unique_ptr<StateInputCost> MobileManipulatorInterface::getJointLimitSoftCon
     }
   }
 
-  auto boxConstraints = std::unique_ptr<StateInputSoftBoxConstraint>(new StateInputSoftBoxConstraint(stateLimits, inputLimits));
-  boxConstraints->initializeOffset(0.0, vector_t::Zero(manipulatorModelInfo_.stateDim), vector_t::Zero(manipulatorModelInfo_.inputDim));
+  auto boxConstraints =
+      std::unique_ptr<StateInputSoftBoxConstraint>(new StateInputSoftBoxConstraint(stateLimits, inputLimits));
+  boxConstraints->initializeOffset(0.0, vector_t::Zero(manipulatorModelInfo_.stateDim),
+                                   vector_t::Zero(manipulatorModelInfo_.inputDim));
   return boxConstraints;
 }
 

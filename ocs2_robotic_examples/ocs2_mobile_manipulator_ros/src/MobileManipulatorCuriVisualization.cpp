@@ -164,10 +164,11 @@ void MobileManipulatorCuriVisualization::publishObservation(const ros::Time& tim
   robotStatePublisherPtr_->publishTransforms(jointPositions, timeStamp);
 
   // Publish base velocity command
-  auto base_vel = observation.input.head(2);
+  auto base_vel = observation.input.head(3);
   geometry_msgs::Twist twist_cmd;
-  twist_cmd.linear.x = base_vel[0];  // TODO Support y-axis velocity
-  twist_cmd.angular.z = base_vel[1];
+  twist_cmd.linear.x = base_vel[0];
+  twist_cmd.linear.y = base_vel[1];
+  twist_cmd.angular.z = base_vel[2];
   cmdVelPublisher_.publish(twist_cmd);
 
   // Publish joint command for the robot

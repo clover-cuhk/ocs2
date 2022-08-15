@@ -32,7 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ocs2_mobile_manipulator_ros/MobileManipulatorCuriVisualization.h>
 
 #include <ocs2_mpc/SystemObservation.h>
-#include <ocs2_ros_interfaces/mrt/MRT_ROS_Dummy_Loop.h>
+#include <ocs2_ros_interfaces/mrt/MRT_ROS_Curi_Loop.h>
 #include <ocs2_ros_interfaces/mrt/MRT_ROS_Interface.h>
 
 #include <ros/init.h>
@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
       new mobile_manipulator::MobileManipulatorCuriVisualization(nodeHandle, interface));
 
   // Dummy MRT
-  MRT_ROS_Dummy_Loop dummy(mrt, interface.mpcSettings().mrtDesiredFrequency_, interface.mpcSettings().mpcDesiredFrequency_);
+  MRT_ROS_Curi_Loop dummy(mrt, interface.mpcSettings().mrtDesiredFrequency_, interface.mpcSettings().mpcDesiredFrequency_);
   dummy.subscribeObservers({dummyVisualization});
 
   // initial state

@@ -61,6 +61,7 @@ add_library(${PROJECT_NAME}
   src/common/RosMsgHelpers.cpp
   src/mpc/MPC_ROS_Interface.cpp
   src/mrt/LoopshapingDummyObserver.cpp
+  src/mrt/MRT_ROS_Curi_Loop.cpp
   src/mrt/MRT_ROS_Dummy_Loop.cpp
   src/mrt/MRT_ROS_Interface.cpp
   src/synchronized_module/RosReferenceManager.cpp

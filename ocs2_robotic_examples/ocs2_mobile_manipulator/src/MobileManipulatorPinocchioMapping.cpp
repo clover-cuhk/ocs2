@@ -77,9 +77,16 @@ auto MobileManipulatorPinocchioMappingTpl<SCALAR>::getPinocchioJointVelocity(con
       break;
     }
     case ManipulatorModelType::WheelBasedMobileManipulator: {
-      const auto theta = state(2);
-      const auto v = input(0);  // forward velocity in base frame
+      const auto& theta = state(2);
+      const auto& v = input(0);  // forward velocity in base frame
       vPinocchio << cos(theta) * v, sin(theta) * v, input(1), input.tail(modelInfo_.armDim);
+      break;
+    }
+    case ManipulatorModelType::OmniBasedMobileManipulator: {
+      const auto& theta = state(2);
+      const auto& v_x = input(0);  // x-axis velocity in base frame
+      const auto& v_y = input(1);  // y-axis velocity in base frame
+      vPinocchio << cos(theta) * v_x + sin(theta) * v_y, sin(theta) * v_x + cos(theta) * v_y, input(2), input.tail(modelInfo_.armDim);
       break;
     }
     default: {
@@ -112,13 +119,26 @@ auto MobileManipulatorPinocchioMappingTpl<SCALAR>::getOcs2Jacobian(const vector_
     case ManipulatorModelType::WheelBasedMobileManipulator: {
       matrix_t dfdu(Jv.rows(), modelInfo_.inputDim);
       Eigen::Matrix<SCALAR, 3, 2> dvdu_base;
-      const SCALAR theta = state(2);
+      const SCALAR& theta = state(2);
       // clang-format off
       dvdu_base << cos(theta), SCALAR(0),
                    sin(theta), SCALAR(0),
                    SCALAR(0), SCALAR(1.0);
       // clang-format on
       dfdu.template leftCols<2>() = Jv.template leftCols<3>() * dvdu_base;
+      dfdu.template rightCols(modelInfo_.armDim) = Jv.template rightCols(modelInfo_.armDim);
+      return {Jq, dfdu};
+    }
+    case ManipulatorModelType::OmniBasedMobileManipulator: {
+      matrix_t dfdu(Jv.rows(), modelInfo_.inputDim);
+      Eigen::Matrix<SCALAR, 3, 3> dvdu_base;
+      const SCALAR& theta = state(2);
+      // clang-format off
+      dvdu_base << cos(theta), -sin(theta), SCALAR(0),
+          sin(theta), cos(theta), SCALAR(0),
+          SCALAR(0), SCALAR(0), SCALAR(1.0);
+      // clang-format on
+      dfdu.template leftCols<3>() = Jv.template leftCols<3>() * dvdu_base;
       dfdu.template rightCols(modelInfo_.armDim) = Jv.template rightCols(modelInfo_.armDim);
       return {Jq, dfdu};
     }

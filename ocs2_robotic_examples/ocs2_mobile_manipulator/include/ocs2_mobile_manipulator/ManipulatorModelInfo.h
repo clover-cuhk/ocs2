@@ -41,9 +41,10 @@ namespace mobile_manipulator {
  */
 enum class ManipulatorModelType {
   DefaultManipulator = 0,                   // default model from the parsed URDF directly
-  WheelBasedMobileManipulator = 1,          // adds actuatable XY-Yaw joints to the model parsed from URDF
+  WheelBasedMobileManipulator = 1,          // adds actuatable X-Yaw joints to the model parsed from URDF
   FloatingArmManipulator = 2,               // adds dummy XYZ-RPY joints to the model parsed from URDF
   FullyActuatedFloatingArmManipulator = 3,  // adds actuatable XYZ-RPY joints to the model parsed from URDF
+  OmniBasedMobileManipulator = 4,           // adds actuatable XY-Yaw joints to the model parsed from URDF
 };
 
 /**
@@ -84,9 +85,12 @@ static std::string modelTypeEnumToString(ManipulatorModelType manipulatorModelTy
       manipulatorModelTypeString = "wheelBasedMobileManipulator";
       break;
     }
+    case ManipulatorModelType::OmniBasedMobileManipulator: {
+      manipulatorModelTypeString = "omniBasedMobileManipulator";
+      break;
+    }
     default:
       throw std::invalid_argument("Invalid manipulator model type provided.");
-      break;
   }
 
   return manipulatorModelTypeString;

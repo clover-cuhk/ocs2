@@ -57,6 +57,10 @@ Eigen::Matrix<SCALAR, 3, 1> getBasePosition(const Eigen::Matrix<SCALAR, -1, 1>& 
       // for wheel-based, we assume 2D base position
       return Eigen::Matrix<SCALAR, 3, 1>(state(0), state(1), 0.0);
     }
+    case ManipulatorModelType::OmniBasedMobileManipulator: {
+      // for omni-based, we assume 2D base position
+      return Eigen::Matrix<SCALAR, 3, 1>(state(0), state(1), 0.0);
+    }
     default:
       throw std::invalid_argument("Invalid manipulator model type provided.");
   }
@@ -85,6 +89,10 @@ Eigen::Quaternion<SCALAR> getBaseOrientation(const Eigen::Matrix<SCALAR, -1, 1>&
     }
     case ManipulatorModelType::WheelBasedMobileManipulator: {
       // for wheel-based, we assume only yaw
+      return Eigen::Quaternion<SCALAR>(Eigen::AngleAxis<SCALAR>(state(2), Eigen::Matrix<SCALAR, 3, 1>::UnitZ()));
+    }
+    case ManipulatorModelType::OmniBasedMobileManipulator: {
+      // for omni-based, we assume only yaw
       return Eigen::Quaternion<SCALAR>(Eigen::AngleAxis<SCALAR>(state(2), Eigen::Matrix<SCALAR, 3, 1>::UnitZ()));
     }
     default:

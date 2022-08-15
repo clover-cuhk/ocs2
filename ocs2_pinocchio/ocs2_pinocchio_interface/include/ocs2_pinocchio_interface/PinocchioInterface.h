@@ -53,7 +53,7 @@ using PinocchioInterface = PinocchioInterfaceTpl<scalar_t>;
 using PinocchioInterfaceCppAd = PinocchioInterfaceTpl<ad_scalar_t>;
 
 /**
- * Pinocchio interface class contatining robot model and data.
+ * Pinocchio interface class containing robot model and data.
  * The robot model is shared between interface instances.
  */
 template <typename SCALAR>
