@@ -29,6 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <nav_msgs/Odometry.h>
+#include <sensor_msgs/JointState.h>
+
 #include "ocs2_ros_interfaces/mrt/DummyObserver.h"
 #include "ocs2_ros_interfaces/mrt/MRT_ROS_Interface.h"
 
@@ -48,7 +51,11 @@ class MRT_ROS_Curi_Loop {
    * @param [in] mpcDesiredFrequency: MPC loop frequency in Hz. If set to a positive number, MPC loop
    * will be simulated to run by this frequency. Note that this might not be the MPC's real-time frequency.
    */
-  MRT_ROS_Curi_Loop(MRT_ROS_Interface& mrt, scalar_t mrtDesiredFrequency, scalar_t mpcDesiredFrequency = -1);
+  MRT_ROS_Curi_Loop(MRT_ROS_Interface& mrt,
+                    const ros::NodeHandle& nodeHandle,
+                    std::vector<std::string> dofNames,
+                    scalar_t mrtDesiredFrequency,
+                    scalar_t mpcDesiredFrequency = -1);
 
   /**
    * Destructor.
@@ -64,7 +71,8 @@ class MRT_ROS_Curi_Loop {
   void run(const SystemObservation& initObservation, const TargetTrajectories& initTargetTrajectories);
 
   /**
-   * Subscribe a set of observers to the dummy loop. Observers are updated in the provided order at the end of each timestep.
+   * Subscribe a set of observers to the dummy loop. Observers are updated in the provided order at the end of each
+   * time step.
    * The previous list of observers is overwritten.
    *
    * @param observers : vector of observers.
@@ -77,13 +85,14 @@ class MRT_ROS_Curi_Loop {
    *
    * @param [in] observation: The current observation.
    */
-  void modifyObservation(SystemObservation& observation);
+  void modifyObservation(SystemObservation& observation) const;
 
  private:
   /**
    * Runs a loop where mpc optimizations are synchronized with the forward simulation of the system
    */
-  void synchronizedDummyLoop(const SystemObservation& initObservation, const TargetTrajectories& initTargetTrajectories);
+  void synchronizedDummyLoop(const SystemObservation& initObservation,
+                             const TargetTrajectories& initTargetTrajectories);
 
   /**
    * Runs a loop where mpc optimizations and simulation of the system are asynchronous.
@@ -94,8 +103,31 @@ class MRT_ROS_Curi_Loop {
   /** Forward simulates the system from current observation*/
   SystemObservation forwardSimulation(const SystemObservation& currentObservation);
 
+  void jointStatesCb(const sensor_msgs::JointState::ConstPtr& msg);
+
+  void odomCb(const nav_msgs::OdometryConstPtr& msg);
+
+  static inline auto getIndex(const std::vector<std::string>& names, const std::string& target) -> int {
+    auto res = std::find(names.begin(), names.end(), target);
+    if (res != names.end()) {
+      return res - names.begin();
+    }
+    return -1;
+  }
+
   MRT_ROS_Interface& mrt_;
   std::vector<std::shared_ptr<DummyObserver>> observers_;
+
+  ros::NodeHandle nh_;
+  ros::Subscriber jointStateSubscriber_;
+  ros::Subscriber odomSubscriber_;
+
+  bool is_odom_updated_{false};
+  nav_msgs::Odometry odom_;
+  bool is_joint_states_updated_{false};
+  sensor_msgs::JointState joint_states_;
+
+  std::vector<std::string> dofNames_;
 
   scalar_t mrtDesiredFrequency_;
   scalar_t mpcDesiredFrequency_;

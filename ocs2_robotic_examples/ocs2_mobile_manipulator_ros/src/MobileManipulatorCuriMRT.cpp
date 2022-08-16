@@ -68,7 +68,8 @@ int main(int argc, char** argv) {
       new mobile_manipulator::MobileManipulatorCuriVisualization(nodeHandle, interface));
 
   // Dummy MRT
-  MRT_ROS_Curi_Loop dummy(mrt, interface.mpcSettings().mrtDesiredFrequency_, interface.mpcSettings().mpcDesiredFrequency_);
+  MRT_ROS_Curi_Loop dummy(mrt, nodeHandle, interface.getManipulatorModelInfo().dofNames,
+                          interface.mpcSettings().mrtDesiredFrequency_, interface.mpcSettings().mpcDesiredFrequency_);
   dummy.subscribeObservers({dummyVisualization});
 
   // initial state

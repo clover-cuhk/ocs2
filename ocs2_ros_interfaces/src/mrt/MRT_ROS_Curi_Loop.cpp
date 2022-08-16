@@ -29,13 +29,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "ocs2_ros_interfaces/mrt/MRT_ROS_Curi_Loop.h"
 
+#include <utility>
+
 namespace ocs2 {
 
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-MRT_ROS_Curi_Loop::MRT_ROS_Curi_Loop(MRT_ROS_Interface& mrt, scalar_t mrtDesiredFrequency, scalar_t mpcDesiredFrequency)
-    : mrt_(mrt), mrtDesiredFrequency_(mrtDesiredFrequency), mpcDesiredFrequency_(mpcDesiredFrequency) {
+MRT_ROS_Curi_Loop::MRT_ROS_Curi_Loop(MRT_ROS_Interface& mrt,
+                                     const ros::NodeHandle& nodeHandle,
+                                     std::vector<std::string> dofNames,
+                                     scalar_t mrtDesiredFrequency,
+                                     scalar_t mpcDesiredFrequency)
+    : mrt_(mrt),
+      nh_(nodeHandle),
+      dofNames_(std::move(dofNames)),
+      mrtDesiredFrequency_(mrtDesiredFrequency),
+      mpcDesiredFrequency_(mpcDesiredFrequency) {
   if (mrtDesiredFrequency_ < 0) {
     throw std::runtime_error("MRT loop frequency should be a positive number.");
   }
@@ -43,12 +53,17 @@ MRT_ROS_Curi_Loop::MRT_ROS_Curi_Loop(MRT_ROS_Interface& mrt, scalar_t mrtDesired
   if (mpcDesiredFrequency_ > 0) {
     ROS_WARN_STREAM("MPC loop is not realtime! For realtime setting, set mpcDesiredFrequency to any negative number.");
   }
+
+  jointStateSubscriber_ =
+      nh_.subscribe<sensor_msgs::JointState>("joint_states", 1, &MRT_ROS_Curi_Loop::jointStatesCb, this);
+  odomSubscriber_ = nh_.subscribe<nav_msgs::Odometry>("odom", 1, &MRT_ROS_Curi_Loop::odomCb, this);
 }
 
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void MRT_ROS_Curi_Loop::run(const SystemObservation& initObservation, const TargetTrajectories& initTargetTrajectories) {
+void MRT_ROS_Curi_Loop::run(const SystemObservation& initObservation,
+                            const TargetTrajectories& initTargetTrajectories) {
   ROS_INFO_STREAM("Waiting for the initial policy ...");
 
   // Reset MPC node
@@ -73,7 +88,8 @@ void MRT_ROS_Curi_Loop::run(const SystemObservation& initObservation, const Targ
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void MRT_ROS_Curi_Loop::synchronizedDummyLoop(const SystemObservation& initObservation, const TargetTrajectories& initTargetTrajectories) {
+void MRT_ROS_Curi_Loop::synchronizedDummyLoop(const SystemObservation& initObservation,
+                                              const TargetTrajectories& initTargetTrajectories) {
   // Determine the ratio between MPC updates and simulation steps.
   const auto mpcUpdateRatio = std::max(static_cast<size_t>(mrtDesiredFrequency_ / mpcDesiredFrequency_), size_t(1));
 
@@ -85,7 +101,8 @@ void MRT_ROS_Curi_Loop::synchronizedDummyLoop(const SystemObservation& initObser
   // Due to ROS message conversion delay and very fast MPC loop, we might get an old policy instead of the latest one.
   const auto policyUpdatedForTime = [this](scalar_t time) {
     constexpr scalar_t tol = 0.1;  // policy must start within this fraction of dt
-    return mrt_.updatePolicy() && std::abs(mrt_.getPolicy().timeTrajectory_.front() - time) < (tol / mpcDesiredFrequency_);
+    return mrt_.updatePolicy() &&
+           std::abs(mrt_.getPolicy().timeTrajectory_.front() - time) < (tol / mpcDesiredFrequency_);
   };
 
   ros::Rate simRate(mrtDesiredFrequency_);
@@ -130,7 +147,8 @@ void MRT_ROS_Curi_Loop::synchronizedDummyLoop(const SystemObservation& initObser
 /******************************************************************************************************/
 /******************************************************************************************************/
 /******************************************************************************************************/
-void MRT_ROS_Curi_Loop::realtimeDummyLoop(const SystemObservation& initObservation, const TargetTrajectories& initTargetTrajectories) {
+void MRT_ROS_Curi_Loop::realtimeDummyLoop(const SystemObservation& initObservation,
+                                          const TargetTrajectories& initTargetTrajectories) {
   // Loop variables
   SystemObservation currentObservation = initObservation;
 
@@ -174,18 +192,50 @@ SystemObservation MRT_ROS_Curi_Loop::forwardSimulation(const SystemObservation& 
   SystemObservation nextObservation;
   nextObservation.time = currentObservation.time + dt;
   if (mrt_.isRolloutSet()) {  // If available, use the provided rollout as to integrate the dynamics.
-    mrt_.rolloutPolicy(currentObservation.time, currentObservation.state, dt, nextObservation.state, nextObservation.input,
-                       nextObservation.mode);
+    mrt_.rolloutPolicy(currentObservation.time, currentObservation.state, dt, nextObservation.state,
+                       nextObservation.input, nextObservation.mode);
   } else {  // Otherwise, we fake integration by interpolating the current MPC policy at t+dt
-    mrt_.evaluatePolicy(currentObservation.time + dt, currentObservation.state, nextObservation.state, nextObservation.input,
-                        nextObservation.mode);
+    mrt_.evaluatePolicy(currentObservation.time + dt, currentObservation.state, nextObservation.state,
+                        nextObservation.input, nextObservation.mode);
   }
 
   return nextObservation;
 }
 
-void MRT_ROS_Curi_Loop::modifyObservation(SystemObservation& observation) {
+void MRT_ROS_Curi_Loop::modifyObservation(SystemObservation& observation) const {
+  if (is_odom_updated_) {
+    auto position = odom_.pose.pose.position;
+    auto orientation = odom_.pose.pose.orientation;
+    Eigen::Quaterniond quaternion(orientation.w, orientation.x, orientation.y, orientation.z);
+    Eigen::Rotation2Dd rot(quaternion.toRotationMatrix().topLeftCorner<2, 2>());
+    auto theta = rot.smallestPositiveAngle();
+    observation.state.head(3) << position.x, position.y, theta;
+  }
+  //  if (is_joint_states_updated_) {
+  //    for (size_t i = 0; i < joint_states_.name.size(); ++i) {
+  //      auto idx = getIndex(dofNames_, joint_states_.name[i]);
+  //      if (idx != -1) {
+  //        observation.state(idx + 3) = joint_states_.position[i];
+  //        observation.input(idx + 3) = joint_states_.velocity[i];
+  //      }
+  //    }
+  //  }
+}
 
+void MRT_ROS_Curi_Loop::jointStatesCb(const sensor_msgs::JointState::ConstPtr& msg) {
+  joint_states_ = *msg;
+  if (!is_joint_states_updated_) {
+    is_joint_states_updated_ = true;
+    ROS_INFO_STREAM("First joint states received");
+  }
+}
+
+void MRT_ROS_Curi_Loop::odomCb(const nav_msgs::OdometryConstPtr& msg) {
+  odom_ = *msg;
+  if (!is_odom_updated_) {
+    is_odom_updated_ = true;
+    ROS_INFO_STREAM("First odom received");
+  }
 }
 
 }  // namespace ocs2
