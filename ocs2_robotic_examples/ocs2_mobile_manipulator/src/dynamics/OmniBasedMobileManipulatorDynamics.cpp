@@ -55,7 +55,7 @@ ad_vector_t OmniBasedMobileManipulatorDynamics::systemFlowMap(ad_scalar_t time,
   const auto& theta = state(2);
   const auto& v_x = input(0);  // x-velocity in base frame
   const auto& v_y = input(1);  // y-velocity in base frame
-  dxdt << cos(theta) * v_x + sin(theta) * v_y, sin(theta) * v_x + cos(theta) * v_y, input(2), input.tail(info_.armDim);
+  dxdt << cos(theta) * v_x - sin(theta) * v_y, sin(theta) * v_x + cos(theta) * v_y, input(2), input.tail(info_.armDim);
   return dxdt;
 }
 

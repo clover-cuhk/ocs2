@@ -86,7 +86,7 @@ auto MobileManipulatorPinocchioMappingTpl<SCALAR>::getPinocchioJointVelocity(con
       const auto& theta = state(2);
       const auto& v_x = input(0);  // x-axis velocity in base frame
       const auto& v_y = input(1);  // y-axis velocity in base frame
-      vPinocchio << cos(theta) * v_x + sin(theta) * v_y, sin(theta) * v_x + cos(theta) * v_y, input(2), input.tail(modelInfo_.armDim);
+      vPinocchio << cos(theta) * v_x - sin(theta) * v_y, sin(theta) * v_x + cos(theta) * v_y, input(2), input.tail(modelInfo_.armDim);
       break;
     }
     default: {
